@@ -3,8 +3,11 @@ import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 
 export const runtime = 'edge';
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   try {
+    const params = await props.params;
+    const id = params.id;
+
     const S3 = new S3Client({
       region: 'auto',
       endpoint: `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`,
@@ -16,7 +19,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
     const result = await S3.send(new GetObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME!,
-      Key: params.id,
+      Key: id,
     }));
 
     const response = new Response(result.Body as any);
