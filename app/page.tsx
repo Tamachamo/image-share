@@ -9,15 +9,24 @@ export default function UploadPage() {
   const [shortUrl, setShortUrl] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // PWA（アプリインストール）用の状態
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
 
+  // 【追加】画面読み込み時に、一時保存されたURLがあれば復元する
+  useEffect(() => {
+    const savedUrl = sessionStorage.getItem('lastGeneratedUrl');
+    if (savedUrl) {
+      setShortUrl(savedUrl);
+    }
+  }, []);
+
   const handleFileSelect = (selectedFile: File) => {
     setFile(selectedFile);
     setShortUrl('');
+    sessionStorage.removeItem('lastGeneratedUrl'); // 新しい画像を選んだら古いURL履歴を消す
+    
     const objectUrl = URL.createObjectURL(selectedFile);
     setPreviewUrl(objectUrl);
 
@@ -31,6 +40,8 @@ export default function UploadPage() {
   const handleClear = () => {
     setFile(null);
     setShortUrl('');
+    sessionStorage.removeItem('lastGeneratedUrl'); // クリア時も履歴を消す
+    
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
       setPreviewUrl(null);
@@ -40,7 +51,6 @@ export default function UploadPage() {
     }
   };
 
-  // ペースト検知
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
       const items = e.clipboardData?.items;
@@ -63,23 +73,18 @@ export default function UploadPage() {
     return () => window.removeEventListener('paste', handlePaste);
   }, []);
 
-  // インストール可能かどうかの判定（PWA設定）
   useEffect(() => {
-    // 既にアプリとして起動しているかチェック
     const isStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
     setIsStandalone(isStandaloneMode);
 
-    // iPhone/iPadかどうかチェック
     const userAgent = window.navigator.userAgent.toLowerCase();
     const isIosDevice = /iphone|ipad|ipod/.test(userAgent);
     setIsIOS(isIosDevice);
 
-    // iOSでブラウザから開いている場合は案内を表示
     if (!isStandaloneMode && isIosDevice) {
       setShowInstallPrompt(true);
     }
 
-    // Android/PCでインストール可能な場合のイベント
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -94,7 +99,6 @@ export default function UploadPage() {
     };
   }, [previewUrl]);
 
-  // インストールボタンを押した時の処理
   const handleInstallClick = async () => {
     if (deferredPrompt) {
       deferredPrompt.prompt();
@@ -130,6 +134,9 @@ export default function UploadPage() {
         if (result.shortId) {
           const generatedUrl = `${window.location.origin}/${result.shortId}`;
           setShortUrl(generatedUrl);
+          
+          // 【追加】生成したURLをブラウザに一時保存する（戻ってきた時用）
+          sessionStorage.setItem('lastGeneratedUrl', generatedUrl);
         } else {
           alert('エラー: ' + result.error);
         }
@@ -145,7 +152,7 @@ export default function UploadPage() {
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4 pb-24">
       <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
-        <h1 className="text-2xl font-bold mb-2 text-center text-gray-800">作戦マップ共有</h1>
+        <h1 className="text-2xl font-bold mb-2 text-center text-gray-800">画像URL共有</h1>
         <p className="text-xs text-center text-gray-500 mb-6">
           画像をコピーして <b>Ctrl+V</b> で貼り付けできます
         </p>
@@ -158,7 +165,7 @@ export default function UploadPage() {
               ref={fileInputRef}
               onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
               className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 mb-4"
-              required={!file}
+              required={!file && !shortUrl}
             />
             
             {previewUrl && (
@@ -177,17 +184,19 @@ export default function UploadPage() {
               </div>
             )}
           </div>
-          <button type="submit" disabled={loading || !file} className="w-full bg-blue-600 text-white py-2 rounded font-bold hover:bg-blue-700 disabled:bg-gray-400 transition shadow">
+          <button type="submit" disabled={loading || (!file && !shortUrl)} className="w-full bg-blue-600 text-white py-2 rounded font-bold hover:bg-blue-700 disabled:bg-gray-400 transition shadow">
             {loading ? 'アップロード中...' : 'URL化する'}
           </button>
         </form>
 
         {shortUrl && (
-          <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded shadow-sm">
+          <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded shadow-sm animate-fade-in-up">
             <p className="text-sm font-bold text-green-800 mb-2">✅ 生成完了</p>
             <input type="text" readOnly value={shortUrl} className="w-full p-2 border rounded text-sm mb-2 font-mono" onClick={(e) => { e.currentTarget.select(); navigator.clipboard.writeText(e.currentTarget.value); }} />
             <p className="text-xs text-center text-gray-500 mb-3">※クリックで自動コピー</p>
-            <a href={shortUrl} target="_blank" rel="noreferrer" className="block text-center text-blue-600 underline text-sm font-bold mb-4">
+            
+            {/* プレビューボタン（同タブで開くPWA仕様に最適化） */}
+            <a href={shortUrl} className="block text-center text-blue-600 underline text-sm font-bold mb-4">
               プレビューを開く
             </a>
             
@@ -201,9 +210,8 @@ export default function UploadPage() {
         )}
       </div>
 
-      {/* 画面下部に固定されるインストール案内バー */}
       {showInstallPrompt && !isStandalone && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] flex flex-row items-center justify-between gap-4 z-50 animate-fade-in-up">
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] flex flex-row items-center justify-between gap-4 z-50">
           <div className="text-sm text-gray-700 flex-1">
             <p className="font-bold mb-1">📱 アプリとして追加できます</p>
             {isIOS ? (
