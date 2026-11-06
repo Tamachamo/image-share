@@ -9,6 +9,12 @@ export default function UploadPage() {
   const [shortUrl, setShortUrl] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // PWA（アプリインストール）用の状態
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
+
   const handleFileSelect = (selectedFile: File) => {
     setFile(selectedFile);
     setShortUrl('');
@@ -22,7 +28,6 @@ export default function UploadPage() {
     }
   };
 
-  // ❌ 画像の選択を解除する関数
   const handleClear = () => {
     setFile(null);
     setShortUrl('');
@@ -31,10 +36,11 @@ export default function UploadPage() {
       setPreviewUrl(null);
     }
     if (fileInputRef.current) {
-      fileInputRef.current.value = ''; // inputのリセット
+      fileInputRef.current.value = '';
     }
   };
 
+  // ペースト検知
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
       const items = e.clipboardData?.items;
@@ -57,11 +63,48 @@ export default function UploadPage() {
     return () => window.removeEventListener('paste', handlePaste);
   }, []);
 
+  // インストール可能かどうかの判定（PWA設定）
   useEffect(() => {
+    // 既にアプリとして起動しているかチェック
+    const isStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+    setIsStandalone(isStandaloneMode);
+
+    // iPhone/iPadかどうかチェック
+    const userAgent = window.navigator.userAgent.toLowerCase();
+    const isIosDevice = /iphone|ipad|ipod/.test(userAgent);
+    setIsIOS(isIosDevice);
+
+    // iOSでブラウザから開いている場合は案内を表示
+    if (!isStandaloneMode && isIosDevice) {
+      setShowInstallPrompt(true);
+    }
+
+    // Android/PCでインストール可能な場合のイベント
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallPrompt(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
     return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
   }, [previewUrl]);
+
+  // インストールボタンを押した時の処理
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setShowInstallPrompt(false);
+      }
+      setDeferredPrompt(null);
+    }
+  };
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,7 +143,7 @@ export default function UploadPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4 pb-24">
       <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
         <h1 className="text-2xl font-bold mb-2 text-center text-gray-800">作戦マップ共有</h1>
         <p className="text-xs text-center text-gray-500 mb-6">
@@ -115,10 +158,9 @@ export default function UploadPage() {
               ref={fileInputRef}
               onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
               className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 mb-4"
-              required={!file} // ファイルがない時だけ必須にする
+              required={!file}
             />
             
-            {/* プレビュー表示エリア（×ボタン追加） */}
             {previewUrl && (
               <div className="mt-4 flex justify-center relative inline-block">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -140,11 +182,10 @@ export default function UploadPage() {
           </button>
         </form>
 
-        {/* 完了画面（続けて作成する案内を追加） */}
         {shortUrl && (
-          <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded">
+          <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded shadow-sm">
             <p className="text-sm font-bold text-green-800 mb-2">✅ 生成完了</p>
-            <input type="text" readOnly value={shortUrl} className="w-full p-2 border rounded text-sm mb-2" onClick={(e) => { e.currentTarget.select(); navigator.clipboard.writeText(e.currentTarget.value); }} />
+            <input type="text" readOnly value={shortUrl} className="w-full p-2 border rounded text-sm mb-2 font-mono" onClick={(e) => { e.currentTarget.select(); navigator.clipboard.writeText(e.currentTarget.value); }} />
             <p className="text-xs text-center text-gray-500 mb-3">※クリックで自動コピー</p>
             <a href={shortUrl} target="_blank" rel="noreferrer" className="block text-center text-blue-600 underline text-sm font-bold mb-4">
               プレビューを開く
@@ -159,6 +200,40 @@ export default function UploadPage() {
           </div>
         )}
       </div>
+
+      {/* 画面下部に固定されるインストール案内バー */}
+      {showInstallPrompt && !isStandalone && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] flex flex-row items-center justify-between gap-4 z-50 animate-fade-in-up">
+          <div className="text-sm text-gray-700 flex-1">
+            <p className="font-bold mb-1">📱 アプリとして追加できます</p>
+            {isIOS ? (
+              <p className="text-xs leading-relaxed">
+                iPhoneの方は、画面下の <b>「共有ボタン(↑)」</b> から<br />
+                <b>「ホーム画面に追加」</b> を選択してください。
+              </p>
+            ) : (
+              <p className="text-xs">ホーム画面に追加すると、次回からアイコンですぐに起動できます。</p>
+            )}
+          </div>
+          
+          {!isIOS && deferredPrompt && (
+            <button
+              onClick={handleInstallClick}
+              className="bg-blue-600 text-white px-4 py-2 rounded-full font-bold text-sm hover:bg-blue-700 whitespace-nowrap shadow-sm transition"
+            >
+              インストール
+            </button>
+          )}
+
+          <button
+            onClick={() => setShowInstallPrompt(false)}
+            className="text-gray-400 hover:text-gray-600 p-2 text-lg"
+            aria-label="閉じる"
+          >
+            ✕
+          </button>
+        </div>
+      )}
     </div>
   );
 }
