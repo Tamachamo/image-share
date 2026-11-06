@@ -7,6 +7,7 @@ export default function UploadPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [shortUrl, setShortUrl] = useState('');
+  const [shortId, setShortId] = useState(''); // IDだけを保持するステートを追加
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -14,18 +15,21 @@ export default function UploadPage() {
   const [isIOS, setIsIOS] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
 
-  // 【追加】画面読み込み時に、一時保存されたURLがあれば復元する
   useEffect(() => {
     const savedUrl = sessionStorage.getItem('lastGeneratedUrl');
-    if (savedUrl) {
+    const savedId = sessionStorage.getItem('lastGeneratedId');
+    if (savedUrl && savedId) {
       setShortUrl(savedUrl);
+      setShortId(savedId);
     }
   }, []);
 
   const handleFileSelect = (selectedFile: File) => {
     setFile(selectedFile);
     setShortUrl('');
-    sessionStorage.removeItem('lastGeneratedUrl'); // 新しい画像を選んだら古いURL履歴を消す
+    setShortId('');
+    sessionStorage.removeItem('lastGeneratedUrl');
+    sessionStorage.removeItem('lastGeneratedId');
     
     const objectUrl = URL.createObjectURL(selectedFile);
     setPreviewUrl(objectUrl);
@@ -40,7 +44,9 @@ export default function UploadPage() {
   const handleClear = () => {
     setFile(null);
     setShortUrl('');
-    sessionStorage.removeItem('lastGeneratedUrl'); // クリア時も履歴を消す
+    setShortId('');
+    sessionStorage.removeItem('lastGeneratedUrl');
+    sessionStorage.removeItem('lastGeneratedId');
     
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
@@ -134,9 +140,10 @@ export default function UploadPage() {
         if (result.shortId) {
           const generatedUrl = `${window.location.origin}/${result.shortId}`;
           setShortUrl(generatedUrl);
+          setShortId(result.shortId);
           
-          // 【追加】生成したURLをブラウザに一時保存する（戻ってきた時用）
           sessionStorage.setItem('lastGeneratedUrl', generatedUrl);
+          sessionStorage.setItem('lastGeneratedId', result.shortId);
         } else {
           alert('エラー: ' + result.error);
         }
@@ -189,16 +196,19 @@ export default function UploadPage() {
           </button>
         </form>
 
-        {shortUrl && (
+        {shortUrl && shortId && (
           <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded shadow-sm animate-fade-in-up">
-            <p className="text-sm font-bold text-green-800 mb-2">✅ 生成完了</p>
+            <p className="text-sm font-bold text-green-800 mb-2">✅ 共有用URL</p>
             <input type="text" readOnly value={shortUrl} className="w-full p-2 border rounded text-sm mb-2 font-mono" onClick={(e) => { e.currentTarget.select(); navigator.clipboard.writeText(e.currentTarget.value); }} />
-            <p className="text-xs text-center text-gray-500 mb-3">※クリックで自動コピー</p>
+            <p className="text-xs text-center text-gray-500 mb-4">※クリックで自動コピー</p>
             
-            {/* プレビューボタン（同タブで開くPWA仕様に最適化） */}
-            <a href={shortUrl} className="block text-center text-blue-600 underline text-sm font-bold mb-4">
-              プレビューを開く
-            </a>
+            <div className="bg-white/60 rounded p-3 mb-4">
+              <p className="text-xs font-bold text-gray-700 mb-2">👀 確認用</p>
+              {/* 確認用プレビューは /preview/〜 を開く */}
+              <a href={`/preview/${shortId}`} className="block text-center text-blue-600 underline text-sm font-bold">
+                プレビュー画面を開く（戻るボタンあり）
+              </a>
+            </div>
             
             <hr className="border-green-200 mb-3" />
             <p className="text-xs text-green-800 text-center font-medium leading-relaxed">
