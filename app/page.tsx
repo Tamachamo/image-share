@@ -206,7 +206,7 @@ export default function UploadPage() {
               <p className="text-xs font-bold text-gray-700 mb-2">👀 確認用</p>
               {/* 確認用プレビューは /preview/〜 を開く */}
               <a href={`/preview/${shortId}`} className="block text-center text-blue-600 underline text-sm font-bold">
-                プレビュー画面を開く（戻るボタンあり）
+                プレビュー画面を開く
               </a>
             </div>
             
