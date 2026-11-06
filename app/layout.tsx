@@ -12,13 +12,13 @@ export const viewport: Viewport = {
 
 // PWA（インストール型アプリ）として認識させるためのメタデータ
 export const metadata: Metadata = {
-  title: '作戦マップ共有',
-  description: '作戦マップを共有するアプリ',
+  title: '画像URL共有',
+  description: '画像をURLで共有するアプリ',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'マップ共有',
+    title: '画像URL共有',
   },
 }
 
