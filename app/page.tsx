@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 
 export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [shortUrl, setShortUrl] = useState('');
-  const [shortId, setShortId] = useState(''); // IDだけを保持するステートを追加
+  const [shortId, setShortId] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -198,15 +199,23 @@ export default function UploadPage() {
 
         {shortUrl && shortId && (
           <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded shadow-sm animate-fade-in-up">
-            <p className="text-sm font-bold text-green-800 mb-2">✅ 共有用URL</p>
+            <p className="text-sm font-bold text-green-800 mb-4">✅ 共有用URL</p>
+            
+            {/* QRコード表示エリア */}
+            <div className="flex flex-col items-center mb-4">
+              <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-200 mb-2">
+                <QRCodeSVG value={shortUrl} size={140} level="M" />
+              </div>
+              <p className="text-xs text-gray-500">スキャンして共有</p>
+            </div>
+
             <input type="text" readOnly value={shortUrl} className="w-full p-2 border rounded text-sm mb-2 font-mono" onClick={(e) => { e.currentTarget.select(); navigator.clipboard.writeText(e.currentTarget.value); }} />
             <p className="text-xs text-center text-gray-500 mb-4">※クリックで自動コピー</p>
             
             <div className="bg-white/60 rounded p-3 mb-4">
               <p className="text-xs font-bold text-gray-700 mb-2">👀 確認用</p>
-              {/* 確認用プレビューは /preview/〜 を開く */}
               <a href={`/preview/${shortId}`} className="block text-center text-blue-600 underline text-sm font-bold">
-                プレビュー画面を開く
+                プレビュー画面を開く（戻るボタンあり）
               </a>
             </div>
             
