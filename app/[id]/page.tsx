@@ -1,3 +1,5 @@
+import ZoomableImage from '@/components/ZoomableImage';
+
 export const runtime = 'edge';
 
 export default async function ViewerPage(props: { params: Promise<{ id: string }> }) {
@@ -5,9 +7,8 @@ export default async function ViewerPage(props: { params: Promise<{ id: string }
   const id = params.id;
 
   return (
-    <div className="min-h-screen bg-[#222] flex items-center justify-center overflow-hidden m-0 p-0">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={`/api/image/${id}`} alt="共有マップ" className="max-w-full max-h-screen object-contain" />
+    <div className="min-h-screen bg-[#222] overflow-hidden m-0 p-0">
+      <ZoomableImage src={`/api/image/${id}`} alt="共有画像" />
     </div>
   );
 }
